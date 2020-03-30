@@ -70,6 +70,7 @@
 #define N 319
 	
 int background [M][N];
+int speed = 4;
 	
 volatile int pixel_buffer_start; // global variable
 #include <stdbool.h>
@@ -90,14 +91,13 @@ void rotate_left(int array[M][N]);
 void draw_background();
 void draw();
 
-
 int main () {
 	volatile int * pixel_ctrl_ptr = (int *)0xFF203020;
 	int color_box[8],  x_box_for_square[20], y_box_for_square[20]; 
 	short color[6] = {0xFFFF, 0xF800, 0x07E0, 0x001F, 0x000F, 0x010F};
 	int triangle_x=319, triangle_y=199, trianglesize, change_in_pos=1;
 	trianglesize=10;
-	change_in_pos=1; 
+	//change_in_pos=4; 
 	bool isvisible = true;
 	// declare other variables(not shown)
     // initialize location and direction of rectangles(not shown)
@@ -145,12 +145,13 @@ int main () {
 			draw_square_player(x_box_for_square, y_box_for_square, color_box);
 		if(isvisible) {
 			draw_triangle_barrier(triangle_x, triangle_y, trianglesize, color_box);
-			update_position_for_triangle(&triangle_x, &triangle_y, trianglesize, &isvisible, change_in_pos); 
+			update_position_for_triangle(&triangle_x, &triangle_y, trianglesize, &isvisible, speed); 
 		}
 		wait_for_vsync(); // swap front and back buffers on VGA vertical sync
 		pixel_buffer_start = *(pixel_ctrl_ptr+1);
 	}
 }
+
 // fill in
 void draw_square_player(int x_box[], int y_box[], int color_box[]) {
 	for(int i=0; i<20; i++) {
@@ -181,6 +182,7 @@ void draw_square_player(int x_box[], int y_box[], int color_box[]) {
 	// draw mouth
 	draw_line(x_box[3], y_box[11], x_box[16], y_box[11], color_box[2]);
 }
+
 // always pass the bottom right coordinate for triangle
 void draw_triangle_barrier(int triangle_x, int triangle_y, int trianglesize, int color_box[]) {
 	draw_square(triangle_x-1, triangle_y-1, color_box[3]);
@@ -190,6 +192,7 @@ void draw_triangle_barrier(int triangle_x, int triangle_y, int trianglesize, int
 	draw_line(triangle_x-trianglesize+1, triangle_y-1, triangle_x-1, triangle_y-1, color_box[3]);
 	draw_line(triangle_x-trianglesize+1, triangle_y-1, triangle_x-(trianglesize)/2, triangle_y-trianglesize, color_box[3]);
 }
+
 void update_position_for_triangle(int* triangle_x, int* triangle_y, int trianglesize, bool* isvisible,  int change_in_pos) { 
 	int leftcenterx = (*triangle_x) - trianglesize + 1;
 	if (leftcenterx < 2) {
@@ -293,13 +296,32 @@ void rotate_left(int array[M][N])
 {
 	int total_size = M*N;
     int *cast_array = (int *)array;
-    int temp = cast_array[0];
-
-    for ( size_t i = 1; i < total_size; ++i )
-        cast_array[i-1] = cast_array[i];
-
-    cast_array[total_size-1] = temp;
-
+    int temp0 = cast_array[0];
+	int temp1 = cast_array[1];
+	int temp2 = cast_array[2];
+	int temp3 = cast_array[3];
+	int temp4 = cast_array[4];
+	int temp5 = cast_array[5];
+	int temp6 = cast_array[6];
+	int temp7 = cast_array[7];
+    for ( size_t i = speed; i < total_size -(speed-1); i=i+speed ){
+        cast_array[i-speed] = cast_array[i];
+		cast_array[i-speed+1] = cast_array[i+1];
+		cast_array[i-speed+2] = cast_array[i+2];
+		cast_array[i-speed+3] = cast_array[i+3];
+		cast_array[i-speed+4] = cast_array[i+4];
+		cast_array[i-speed+5] = cast_array[i+5];
+		cast_array[i-speed+6] = cast_array[i+6];
+		cast_array[i-speed+7] = cast_array[i+7];
+	}
+    cast_array[total_size-1] = temp7;
+	cast_array[total_size-2] = temp6;
+	cast_array[total_size-3] = temp5;
+	cast_array[total_size-4] = temp4;
+	cast_array[total_size-5] = temp3;
+	cast_array[total_size-6] = temp2;
+	cast_array[total_size-7] = temp1;
+	cast_array[total_size-8] = temp0;
 }
 
 void draw_background(){
@@ -314,10 +336,8 @@ void draw_background(){
 	
 	//Pretty choppy, only erase what's necessary
 	//Rotating the background left to move 
-	int speed = 4;
-	for (int i = 0; i <speed; i++){
-		rotate_left(background);
-	}
+
+	rotate_left(background);
 	
 }
 
@@ -404,6 +424,7 @@ void plot_pixel(int x, int y, short int line_color)
 {
     *(short int *)(pixel_buffer_start + (y << 10) + (x << 1)) = line_color;
 }
+
 void wait_for_vsync() {
 	volatile int * pixel_ctrl_ptr = 0xFF203020; //pixel controller
 	register int status;
