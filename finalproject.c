@@ -1,3 +1,71 @@
+/*----------------------------------------------------------------------------------------------------------*/
+//address_map_arm.h
+/*----------------------------------------------------------------------------------------------------------*/
+
+
+/* This files provides address values that exist in the system */
+
+#define BOARD                 "DE1-SoC"
+//#include "address_map_arm.h"
+/* Memory */
+#define DDR_BASE              0x00000000
+#define DDR_END               0x3FFFFFFF
+#define A9_ONCHIP_BASE        0xFFFF0000
+#define A9_ONCHIP_END         0xFFFFFFFF
+#define SDRAM_BASE            0xC0000000
+#define SDRAM_END             0xC3FFFFFF
+#define FPGA_ONCHIP_BASE      0xC8000000
+#define FPGA_ONCHIP_END       0xC803FFFF
+#define FPGA_CHAR_BASE        0xC9000000
+#define FPGA_CHAR_END         0xC9001FFF
+
+/* Cyclone V FPGA devices */
+#define LEDR_BASE             0xFF200000
+#define HEX3_HEX0_BASE        0xFF200020
+#define HEX5_HEX4_BASE        0xFF200030
+#define SW_BASE               0xFF200040
+#define KEY_BASE              0xFF200050
+#define JP1_BASE              0xFF200060
+#define JP2_BASE              0xFF200070
+#define PS2_BASE              0xFF200100
+#define PS2_DUAL_BASE         0xFF200108
+#define JTAG_UART_BASE        0xFF201000
+#define JTAG_UART_2_BASE      0xFF201008
+#define IrDA_BASE             0xFF201020
+#define TIMER_BASE            0xFF202000
+#define AV_CONFIG_BASE        0xFF203000
+#define PIXEL_BUF_CTRL_BASE   0xFF203020
+#define CHAR_BUF_CTRL_BASE    0xFF203030
+#define AUDIO_BASE            0xFF203040
+#define VIDEO_IN_BASE         0xFF203060
+#define ADC_BASE              0xFF204000
+
+/* Cyclone V HPS devices */
+#define HPS_GPIO1_BASE        0xFF709000
+#define HPS_TIMER0_BASE       0xFFC08000
+#define HPS_TIMER1_BASE       0xFFC09000
+#define HPS_TIMER2_BASE       0xFFD00000
+#define HPS_TIMER3_BASE       0xFFD01000
+#define FPGA_BRIDGE           0xFFD0501C
+
+/* ARM A9 MPCORE devices */
+#define   PERIPH_BASE         0xFFFEC000    // base address of peripheral devices
+#define   MPCORE_PRIV_TIMER   0xFFFEC600    // PERIPH_BASE + 0x0600
+
+/* Interrupt controller (GIC) CPU interface(s) */
+#define MPCORE_GIC_CPUIF      0xFFFEC100    // PERIPH_BASE + 0x100
+#define ICCICR                0x00          // offset to CPU interface control reg
+#define ICCPMR                0x04          // offset to interrupt priority mask reg
+#define ICCIAR                0x0C          // offset to interrupt acknowledge reg
+#define ICCEOIR               0x10          // offset to end of interrupt reg
+/* Interrupt controller (GIC) distributor interface(s) */
+#define MPCORE_GIC_DIST       0xFFFED000    // PERIPH_BASE + 0x1000
+#define ICDDCR                0x00          // offset to distributor control reg
+#define ICDISER               0x100         // offset to interrupt set-enable regs
+#define ICDICER               0x180         // offset to interrupt clear-enable regs
+#define ICDIPTR               0x800         // offset to interrupt processor targets regs
+#define ICDICFR               0xC00         // offset to interrupt configuration regs
+
 #define M 199 
 #define N 319
 	
@@ -8,6 +76,25 @@ volatile int pixel_buffer_start; // global variable
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+// interrupt code
+void set_A9_IRQ_stack(void);
+void config_GIC(void);
+//void config_HPS_timer(void);
+//void config_HPS_GPIO1(void);
+//void config_interval_timer(void);
+void config_KEYs(void);
+void enable_A9_interrupts(void);
+/* key_dir and pattern are written by interrupt service routines; we have to
+* declare these as volatile to avoid the compiler caching their values in
+* registers */
+volatile int tick = 0; // set to 1 every time the HPS timer expires
+volatile int key_dir = 0;
+volatile int pattern = 0x0F0F0F0F; // pattern for LED lights
+
+extern volatile int key_dir;
+extern volatile int pattern;
+// 
+void update_position_for_player();
 void clear_screen();
 void clear_screen_for_triangle(int triangle_x, int triangle_y, int trianglesize); 
 void draw_line(int x0, int y0, int x1, int y1, short int line_colour);
@@ -16,37 +103,35 @@ void wait_for_vsync();
 void draw_square_player(int x_box[], int y_box[], int color_box[]);
 void draw_square(int x, int y, short int line_color);
 void draw_triangle_barrier(int triangle_x, int triangle_y, int trianglesize, int color_box[]);
-void update_position_for_triangle(int* triangle_x, int* triangle_y, int trianglesize, bool *isvisible[], int change_in_pos);
+void update_position_for_triangle(int* triangle_x, int* triangle_y, int trianglesize, bool *isvisible, int change_in_pos);
 void draw_ground();
 void initialize_background();
 void rotate_left(int array[M][N]);
 void draw_background();
 void draw();
-void draw_obstacle_single_block(int obstacle_box_x, int colour);
-void update_position_single_block(int *obstacle_box_x, int speed, bool *isvisible[]);
-void draw_obstacle_spikes(int spike_x, int colour);
-void update_position_spikes(int *spike_x, int speed, bool *isvisible[]);
-void draw_obstacle_hanging(int hanging_x, int colour);
-void update_position_hanging(int *hanging_x, int speed, bool *isvisible[]);
-void draw_obstacle_hanging(int hanging_x, int colour);
-void update_position_hanging(int *hanging_x, int speed, bool *isvisible[]);
-
+int  x_box_for_square[20], y_box_for_square[20];
+bool isjumping;
+void pushbutton_ISR(void);
+void jump ();
 int main () {
+	//volatile int * HPS_GPIO1_ptr = (int *)HPS_GPIO1_BASE; // GPIO1 base address
+//volatile int HPS_timer_LEDG =
+//0x01000000; // value to turn on the HPS green light LEDG
+	set_A9_IRQ_stack(); // initialize the stack pointer for IRQ mode
+	config_GIC(); // configure the general interrupt controller
+//	config_HPS_timer(); // configure the HPS timer
+//	config_HPS_GPIO1(); // configure the HPS GPIO1 interface
+//	config_interval_timer(); // configure Altera interval timer to generate
+	// interrupts
+	config_KEYs(); // configure pushbutton KEYs to generate interrupts
+	enable_A9_interrupts(); // enable interrup
 	volatile int * pixel_ctrl_ptr = (int *)0xFF203020;
-	int color_box[8],  x_box_for_square[20], y_box_for_square[20]; 
-	int obstacle_box_x = 319 - 20;
-	int spike_x = 319 - 20;
-	int hanging_x = 319 - 20;
+	int color_box[8]; 
 	short color[6] = {0xFFFF, 0xF800, 0x07E0, 0x001F, 0x000F, 0x010F};
 	int triangle_x=319, triangle_y=199, trianglesize, change_in_pos=1;
 	trianglesize=10;
 	//change_in_pos=4; 
-	//bool isvisible = true;
-	bool isvisible [10];
-	for (int i = 1; i <10; i++){
-		isvisible[i] = false;
-	}
-	isvisible[0] = true;
+	bool isvisible = true;
 	// declare other variables(not shown)
     // initialize location and direction of rectangles(not shown)
 
@@ -59,9 +144,10 @@ int main () {
 	pixel_buffer_start = *(pixel_ctrl_ptr);
 	clear_screen();
 	/* now, swap the front/back buffers, to set the front buffer location */
-
+   // wait_for_vsync();
     /* initialize a pointer to the pixel buffer, used by drawing functions */
-    // pixel_buffer_start points to the pixel buffer
+   // pixel_buffer_start = *pixel_ctrl_ptr;
+    //clear_screen(); // pixel_buffer_start points to the pixel buffer
     /* set back pixel buffer to start of SDRAM memory */
     *(pixel_ctrl_ptr + 1) = 0xC0000000;
     pixel_buffer_start = *(pixel_ctrl_ptr + 1); // we draw on the back buffer
@@ -87,33 +173,156 @@ int main () {
 	draw_square_player(x_box_for_square, y_box_for_square, color_box); // draw the square player 
 	wait_for_vsync();
 	while (1) {
-		clear_screen_for_triangle(triangle_x, triangle_y, trianglesize); 	/* Erase any boxes and lines that were drawn in the last iteration */
+		//clear_screen_for_triangle(triangle_x, triangle_y, trianglesize); 	/* Erase any boxes and lines that were drawn in the last iteration */
 		draw();
 		draw_square_player(x_box_for_square, y_box_for_square, color_box);
-		if(isvisible[0]) {
+		update_position_for_player();
+		// next time I draw it the position of the square will be different	
+		if(isvisible) {
 			draw_triangle_barrier(triangle_x, triangle_y, trianglesize, color_box);
 			update_position_for_triangle(&triangle_x, &triangle_y, trianglesize, &isvisible, speed); 
-			if (triangle_x <=319-30) isvisible[1] = true;
-		}
-		if(isvisible[1]) {
-			draw_obstacle_single_block(obstacle_box_x, 0xFFFF);
-			update_position_single_block(&obstacle_box_x, speed, &isvisible);
-			if (obstacle_box_x <=319 - 60) isvisible[2] = true;
-		}
-		if (isvisible[2]){
-			draw_obstacle_spikes(spike_x, 0xFFFF);
-			update_position_spikes(&spike_x, speed, &isvisible);
-			if (spike_x <=319 - 60) isvisible[3] = true;
-		}
-		if (isvisible[3]){
-			draw_obstacle_hanging(hanging_x, 0xFFFF);
-			update_position_hanging(&hanging_x, speed, &isvisible);
 		}
 		wait_for_vsync(); // swap front and back buffers on VGA vertical sync
 		pixel_buffer_start = *(pixel_ctrl_ptr+1);
 	}
 }
+void update_position_for_player() {
+	if (isjumping) {
+		for (int i=0; i<20; i++) {
+			y_box_for_square[i] = y_box_for_square[i] -1;
+		}
+		if (y_box_for_square[0] < 159) {
+			isjumping=false; 	
+		}
+	}
+	else if(y_box_for_square[0] < 179) {
+		for (int i=0; i<20; i++) {
+			y_box_for_square[i] = y_box_for_square[i] +1;
+		}
+	}
+}
+void config_KEYs() {
+	volatile int * KEY_ptr = (int *)KEY_BASE; // pushbutton KEY address
+	*(KEY_ptr + 2) = 0xf; // enable interrupts for KEY[1]
+}
+int SVC_MODE = 0b10011;
+//int INT_DISABLE = 0b10000000;
+//int INT_ENABLE = 0;
+int IRQ_MODE = 0b10010; 
+int ENABLE = 1; 
+int KEYS_IRQ = 73; 
 
+void enable_A9_interrupts(void)
+{
+	int status = 0b01010011;
+	asm("msr cpsr, %[ps]" : : [ps] "r"(status));
+}
+void set_A9_IRQ_stack(void)
+{
+	int stack, mode;
+	stack = A9_ONCHIP_END - 7; // top of A9 onchip memory, aligned to 8 bytes
+	/* change processor to IRQ mode with interrupts disabled */
+	mode = 0b11010010;
+	asm("msr cpsr, %[ps]" : : [ps] "r"(mode));
+/* set banked stack pointer */
+	asm("mov sp, %[ps]" : : [ps] "r"(stack));
+	/* go back to SVC mode before executing subroutine return! */
+	mode = 0b11010011;	
+	asm("msr cpsr, %[ps]" : : [ps] "r"(mode));
+}
+/*
+void config_GIC(void)
+{
+	int address; // used to calculate register addresses
+	 configure the HPS timer interrupt 
+	*((int *)0xFFFED8C4) = 0x01000000;
+	*((int *)0xFFFED118) = 0x00000080;
+	 configure the FPGA interval timer and KEYs interrupts 
+	*((int *)0xFFFED848) = 0x00000101;
+	*((int *)0xFFFED108) = 0x00000300;
+	// Set Interrupt Priority Mask Register (ICCPMR). Enable interrupts of all
+	// priorities
+	address = MPCORE_GIC_CPUIF + ICCPMR;
+	*((int *)address) = 0xFFFF;
+	address = MPCORE_GIC_CPUIF + ICCICR;
+	*((int *)address) = ENABLE;
+	// Configure the Distributor Control Register (ICDDCR) to send pending
+	// interrupts to CPUs
+	address = MPCORE_GIC_DIST + ICDDCR;
+	*((int *)address) = ENABLE;
+}
+*/
+void config_GIC(void)
+{
+	config_interrupt (73, 1); // configure the KEYs parallel port (Interrupt ID = 73)
+	// Set Interrupt Priority Mask Register (ICCPMR). Enable interrupts of all priorities
+	*((int *) 0xFFFEC104) = 0xFFFF;
+	// Set CPU Interface Control Register (ICCICR). Enable signaling of interrupts
+	*((int *) 0xFFFEC100) = 1;
+	// Configure the Distributor Control Register (ICDDCR) to send pending interrupts to CPUs
+	*((int *) 0xFFFED000) = 1;
+}
+/*
+* Configure Set Enable Registers (ICDISERn) and Interrupt Processor Target Registers (ICDIPTRn).
+* The default (reset) values are used for other registers in the GIC.
+*/
+void config_interrupt (int L, int CPU_target)
+{
+	int reg_offset, index, value, address;
+	/* Configure the Interrupt Set-Enable Registers (ICDISERn).
+	* reg_offset = (integer_div(N / 32) * 4
+	* value = 1 << (N mod 32) */
+	reg_offset = (L >> 3) & 0xFFFFFFFC;
+	index = L & 0x1F;
+	value = 0x1 << index;
+	address = 0xFFFED100 + reg_offset;
+	/* Now that we know the register address and value, set the appropriate bit */
+	*(int *)address |= value;
+	/* Configure the Interrupt Processor Targets Register (ICDIPTRn)
+	* reg_offset = integer_div(N / 4) * 4
+	* index = N mod 4 */
+	reg_offset = (L & 0xFFFFFFFC);
+	index = L & 0x3;
+	address = 0xFFFED800 + reg_offset + index;
+	/* Now that we know the register address and value, write to (only) the appropriate byte */
+	*(char *)address = (char) CPU_target;
+}
+
+void __attribute__((interrupt)) __cs3_isr_irq(void)
+{
+// Read the ICCIAR from the processor interface
+	int address = MPCORE_GIC_CPUIF + ICCIAR;
+	int int_ID = *((int *)address);
+	//if (int_ID == HPS_TIMER0_IRQ) // check if interrupt is from the HPS timer
+	//HPS_timer_ISR();
+	//else if (int_ID ==
+	//INTERVAL_TIMER_IRQ) // check if interrupt is from the Altera timer
+	//interval_timer_ISR();
+	if (int_ID == KEYS_IRQ) { // check if interrupt is from the KEYs
+		pushbutton_ISR();
+	}
+	else
+	while (1)
+	; // if unexpected, then stay here
+	// Write to the End of Interrupt Register (ICCEOIR)
+	address = MPCORE_GIC_CPUIF + ICCEOIR;
+	*((int *)address) = int_ID;
+	return;
+}
+// do something when button is pressed 
+void pushbutton_ISR(void)
+{
+	volatile int * KEY_ptr = (int *)KEY_BASE;
+	int press;
+	press = *(KEY_ptr + 3); // read the pushbutton interrupt register
+	*(KEY_ptr + 3) = press; // Clear the interrupt
+	jump();
+	return;
+}
+// done with jump
+void jump () {
+	isjumping= true; 	
+}
 // fill in
 void draw_square_player(int x_box[], int y_box[], int color_box[]) {
 	for(int i=0; i<20; i++) {
@@ -155,33 +364,12 @@ void draw_triangle_barrier(int triangle_x, int triangle_y, int trianglesize, int
 	draw_line(triangle_x-trianglesize+1, triangle_y-1, triangle_x-(trianglesize)/2, triangle_y-trianglesize, color_box[3]);
 }
 
-void draw_obstacle_hanging(int hanging_x, int colour){
-	//hanging_x will be the x coordinate of the hanging block, not the wire or the triangle
-	for (int x = hanging_x + 8; x <= hanging_x + 12; x++){
-		draw_line (x,0,x,199-60,colour);
-	}
-	for (int x = hanging_x;x < hanging_x + 20; x++){
-		draw_line (x,199-60,x,199-40,colour);
-	}
-	for (int x = hanging_x; x <= hanging_x + 10; x++){
-		draw_line (x,199-40,hanging_x+10,199-25,colour);
-	}
-	for (int x = hanging_x+10; x < hanging_x + 20; x++){
-		draw_line (hanging_x + 10,199-25,x,199-40,colour);
-	}
-}
-
-void update_position_hanging(int *hanging_x, int speed, bool *isvisible[]){
-	*hanging_x= *hanging_x - speed;
-	if (hanging_x < 0) *isvisible[3] = false;
-}
-
-void update_position_for_triangle(int* triangle_x, int* triangle_y, int trianglesize, bool* isvisible[],  int change_in_pos) { 
+void update_position_for_triangle(int* triangle_x, int* triangle_y, int trianglesize, bool* isvisible,  int change_in_pos) { 
 	int leftcenterx = (*triangle_x) - trianglesize + 1;
 	if (leftcenterx < 2) {
-		(*isvisible[0]) = false; 	
+		(*isvisible) = false; 	
 	}
-	if(isvisible[0]) {
+	if(isvisible) {
 		(*triangle_x)=(*triangle_x)-change_in_pos;
 	}
 }
@@ -194,42 +382,6 @@ void draw_ground(){        				//Ground starts at (199,239)
 			plot_pixel(x,199,0xFFFF);
 		}
 	}
-}
-
-void update_position_single_block(int *obstacle_box_x, int speed, bool *isvisible[]){
-	*obstacle_box_x= *obstacle_box_x - speed;
-	if (obstacle_box_x < 0) *isvisible[1] = false;
-}
-
-void draw_obstacle_single_block(int obstacle_box_x, int colour){
-	//if (obstacle_box_x <=319 - 20){
-		for (int x = obstacle_box_x; x < 20 + obstacle_box_x; x++){
-			for (int y = 199-20; y<199;y++){
-				plot_pixel (x,y,colour);
-			}
-		}
-	//}
-}
-
-void draw_obstacle_spikes(int spike_x, int colour){
-	
-	for (int x = spike_x; x <spike_x + 5; x ++){
-		draw_line (spike_x,199-12,x,199,colour);
-	}
-	for (int x = spike_x+5; x <spike_x + 10; x ++){
-		draw_line (spike_x + 5,199-12,x,199,colour);
-	}
-	for (int x = spike_x+10; x <spike_x + 15; x ++){
-		draw_line (spike_x+10,199-12,x,199,colour);
-	}
-	for (int x = spike_x+15; x <spike_x + 20; x ++){
-		draw_line (spike_x+15,199-12,x,199,colour);
-	}
-}
-
-void update_position_spikes(int *spike_x, int speed, bool *isvisible[]){
-	*spike_x= *spike_x - speed;
-	if (spike_x < 0) *isvisible[2] = false;
 }
 
 //Initialize the background to the original picture
@@ -349,9 +501,6 @@ void draw_background(){
 		for (int y = 0; y<=198; y++){
 			if (background[y][x] == 1){
 				plot_pixel(x,y,0x443E);
-			}
-			else{
-				plot_pixel(x,y,0x0275);
 			}
 		}
 	}
