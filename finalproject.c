@@ -103,7 +103,7 @@ void wait_for_vsync();
 void draw_square_player(int x_box[], int y_box[], int color_box[]);
 void draw_square(int x, int y, short int line_color);
 void draw_triangle_barrier(int triangle_x, int triangle_y, int trianglesize, int color_box[]);
-void update_position_for_triangle(int* triangle_x, int* triangle_y, int trianglesize, bool *isvisible, int change_in_pos);
+void update_position_for_triangle(int* triangle_x, int* triangle_y, int trianglesize, bool *isvisible[], int change_in_pos);
 void draw_ground();
 void initialize_background();
 void rotate_left(int array[M][N]);
@@ -113,6 +113,13 @@ int  x_box_for_square[20], y_box_for_square[20];
 bool isjumping;
 void pushbutton_ISR(void);
 void jump ();
+void draw_obstacle_single_block(int obstacle_box_x, int colour);
+void update_position_single_block(int *obstacle_box_x, int speed, bool *isvisible[]);
+void draw_obstacle_spikes(int spike_x, int colour);
+void update_position_spikes(int *spike_x, int speed, bool *isvisible[]);
+void draw_obstacle_hanging(int hanging_x, int colour);
+void update_position_hanging(int *hanging_x, int speed, bool *isvisible[]);
+
 int main () {
 	//volatile int * HPS_GPIO1_ptr = (int *)HPS_GPIO1_BASE; // GPIO1 base address
 //volatile int HPS_timer_LEDG =
@@ -130,8 +137,15 @@ int main () {
 	short color[6] = {0xFFFF, 0xF800, 0x07E0, 0x001F, 0x000F, 0x010F};
 	int triangle_x=319, triangle_y=199, trianglesize, change_in_pos=1;
 	trianglesize=10;
+	int obstacle_box_x = 319 - 20;
+	int spike_x = 319 - 20;
+	int hanging_x = 319 - 20;
 	//change_in_pos=4; 
-	bool isvisible = true;
+	bool isvisible [10];
+	for (int i = 1; i <10; i++){
+		isvisible[i] = false;
+	}
+	isvisible[0] = true;
 	// declare other variables(not shown)
     // initialize location and direction of rectangles(not shown)
 
@@ -178,9 +192,24 @@ int main () {
 		draw_square_player(x_box_for_square, y_box_for_square, color_box);
 		update_position_for_player();
 		// next time I draw it the position of the square will be different	
-		if(isvisible) {
+		if(isvisible[0]) {
 			draw_triangle_barrier(triangle_x, triangle_y, trianglesize, color_box);
 			update_position_for_triangle(&triangle_x, &triangle_y, trianglesize, &isvisible, speed); 
+			if (triangle_x <=319-30) isvisible[1] = true;
+		}
+		if(isvisible[1]) {
+			draw_obstacle_single_block(obstacle_box_x, 0xFFFF);
+			update_position_single_block(&obstacle_box_x, speed, &isvisible);
+			if (obstacle_box_x <=319 - 60) isvisible[2] = true;
+		}
+		if (isvisible[2]){
+			draw_obstacle_spikes(spike_x, 0xFFFF);
+			update_position_spikes(&spike_x, speed, &isvisible);
+			if (spike_x <=319 - 60) isvisible[3] = true;
+		}
+		if (isvisible[3]){
+			draw_obstacle_hanging(hanging_x, 0xFFFF);
+			update_position_hanging(&hanging_x, speed, &isvisible);
 		}
 		wait_for_vsync(); // swap front and back buffers on VGA vertical sync
 		pixel_buffer_start = *(pixel_ctrl_ptr+1);
@@ -364,14 +393,71 @@ void draw_triangle_barrier(int triangle_x, int triangle_y, int trianglesize, int
 	draw_line(triangle_x-trianglesize+1, triangle_y-1, triangle_x-(trianglesize)/2, triangle_y-trianglesize, color_box[3]);
 }
 
-void update_position_for_triangle(int* triangle_x, int* triangle_y, int trianglesize, bool* isvisible,  int change_in_pos) { 
+void update_position_for_triangle(int* triangle_x, int* triangle_y, int trianglesize, bool* isvisible[],  int change_in_pos) { 
 	int leftcenterx = (*triangle_x) - trianglesize + 1;
 	if (leftcenterx < 2) {
-		(*isvisible) = false; 	
+		(*isvisible[0]) = false; 	
 	}
-	if(isvisible) {
+	if(isvisible[0]) {
 		(*triangle_x)=(*triangle_x)-change_in_pos;
 	}
+}
+
+void draw_obstacle_hanging(int hanging_x, int colour){
+	//hanging_x will be the x coordinate of the hanging block, not the wire or the triangle
+	for (int x = hanging_x + 8; x <= hanging_x + 12; x++){
+		draw_line (x,0,x,199-60,colour);
+	}
+	for (int x = hanging_x;x < hanging_x + 20; x++){
+		draw_line (x,199-60,x,199-40,colour);
+	}
+	for (int x = hanging_x; x <= hanging_x + 10; x++){
+		draw_line (x,199-40,hanging_x+10,199-25,colour);
+	}
+	for (int x = hanging_x+10; x < hanging_x + 20; x++){
+		draw_line (hanging_x + 10,199-25,x,199-40,colour);
+	}
+}
+
+void update_position_hanging(int *hanging_x, int speed, bool *isvisible[]){
+	*hanging_x= *hanging_x - speed;
+	if (hanging_x < 0) *isvisible[3] = false;
+}
+
+void update_position_single_block(int *obstacle_box_x, int speed, bool *isvisible[]){
+	*obstacle_box_x= *obstacle_box_x - speed;
+	if (obstacle_box_x < 0) *isvisible[1] = false;
+}
+
+void draw_obstacle_single_block(int obstacle_box_x, int colour){
+	//if (obstacle_box_x <=319 - 20){
+		for (int x = obstacle_box_x; x < 20 + obstacle_box_x; x++){
+			for (int y = 199-20; y<199;y++){
+				plot_pixel (x,y,colour);
+			}
+		}
+	//}
+}
+
+void draw_obstacle_spikes(int spike_x, int colour){
+	
+	for (int x = spike_x; x <spike_x + 5; x ++){
+		draw_line (spike_x,199-12,x,199,colour);
+	}
+	for (int x = spike_x+5; x <spike_x + 10; x ++){
+		draw_line (spike_x + 5,199-12,x,199,colour);
+	}
+	for (int x = spike_x+10; x <spike_x + 15; x ++){
+		draw_line (spike_x+10,199-12,x,199,colour);
+	}
+	for (int x = spike_x+15; x <spike_x + 20; x ++){
+		draw_line (spike_x+15,199-12,x,199,colour);
+	}
+}
+
+void update_position_spikes(int *spike_x, int speed, bool *isvisible[]){
+	*spike_x= *spike_x - speed;
+	if (spike_x < 0) *isvisible[2] = false;
 }
 
 //Draw ground with a white line for clarity
