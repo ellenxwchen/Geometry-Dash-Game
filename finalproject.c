@@ -70,7 +70,7 @@
 #define N 319
 	
 int background [M][N];
-int speed = 4;
+int speed = 20;
 	
 volatile int pixel_buffer_start; // global variable
 #include <stdbool.h>
@@ -103,7 +103,7 @@ void wait_for_vsync();
 void draw_square_player(int x_box[], int y_box[], int color_box[]);
 void draw_square(int x, int y, short int line_color);
 void draw_triangle_barrier(int triangle_x, int triangle_y, int trianglesize, int color_box[]);
-void update_position_for_triangle(int* triangle_x, int* triangle_y, int trianglesize, bool *isvisible[], int change_in_pos);
+void update_position_for_triangle(int* triangle_x, int* triangle_y, int trianglesize, bool isvisible[], int change_in_pos);
 void draw_ground();
 void initialize_background();
 void rotate_left(int array[M][N]);
@@ -114,16 +114,18 @@ bool isjumping;
 void pushbutton_ISR(void);
 void jump ();
 void draw_obstacle_single_block(int obstacle_box_x, int colour);
-void update_position_single_block(int *obstacle_box_x, int speed, bool *isvisible[]);
+void update_position_single_block(int *obstacle_box_x, int speed, bool isvisible[]);
 void draw_obstacle_spikes(int spike_x, int colour);
-void update_position_spikes(int *spike_x, int speed, bool *isvisible[]);
+void update_position_spikes(int *spike_x, int speed, bool isvisible[]);
 void draw_obstacle_hanging(int hanging_x, int colour);
-void update_position_hanging(int *hanging_x, int speed, bool *isvisible[]);
-
+void update_position_hanging(int *hanging_x, int speed, bool isvisible[]);
+void config_interrupt (int L, int CPU_target);
+bool collision_detection(int y_box_for_square[], int triangle_x, int obstacle_box_x, int spike_x, int hanging_x);
+bool alive;
+void draw_game_over_screen();
 int main () {
 	//volatile int * HPS_GPIO1_ptr = (int *)HPS_GPIO1_BASE; // GPIO1 base address
-//volatile int HPS_timer_LEDG =
-//0x01000000; // value to turn on the HPS green light LEDG
+//volatile ; value to turn on the HPS green light LEDG
 	set_A9_IRQ_stack(); // initialize the stack pointer for IRQ mode
 	config_GIC(); // configure the general interrupt controller
 //	config_HPS_timer(); // configure the HPS timer
@@ -184,36 +186,67 @@ int main () {
 	for (int i=0; i<20; i++) {
 		y_box_for_square[i]=i+179;
 	}
-	draw_square_player(x_box_for_square, y_box_for_square, color_box); // draw the square player 
-	wait_for_vsync();
-	while (1) {
+	//draw_square_player(x_box_for_square, y_box_for_square, color_box); // draw the square player 
+	//wait_for_vsync();
+	alive = true;
+	while (alive) {
 		//clear_screen_for_triangle(triangle_x, triangle_y, trianglesize); 	/* Erase any boxes and lines that were drawn in the last iteration */
 		draw();
 		draw_square_player(x_box_for_square, y_box_for_square, color_box);
 		update_position_for_player();
 		// next time I draw it the position of the square will be different	
-		if(isvisible[0]) {
-			draw_triangle_barrier(triangle_x, triangle_y, trianglesize, color_box);
-			update_position_for_triangle(&triangle_x, &triangle_y, trianglesize, &isvisible, speed); 
-			if (triangle_x <=319-30) isvisible[1] = true;
-		}
+		update_position_for_triangle(&triangle_x, &triangle_y, trianglesize, isvisible, speed);
+		draw_triangle_barrier(triangle_x, triangle_y, trianglesize, color_box); 
+		// set distances between obstacles
+		if ( triangle_x <= 319- 100 ) isvisible[1] = true;
+		
 		if(isvisible[1]) {
+			update_position_single_block(&obstacle_box_x, speed, isvisible);
 			draw_obstacle_single_block(obstacle_box_x, 0xFFFF);
-			update_position_single_block(&obstacle_box_x, speed, &isvisible);
-			if (obstacle_box_x <=319 - 60) isvisible[2] = true;
+		// set distances between obstacles 	
+			if (obstacle_box_x <=319 - 100) isvisible[2] = true;
 		}
 		if (isvisible[2]){
+			update_position_spikes(&spike_x, speed, isvisible);
 			draw_obstacle_spikes(spike_x, 0xFFFF);
-			update_position_spikes(&spike_x, speed, &isvisible);
-			if (spike_x <=319 - 60) isvisible[3] = true;
+		// set distances between obstacles	
+			if (spike_x <=319 - 100) isvisible[3] = true;
 		}
 		if (isvisible[3]){
+			update_position_hanging(&hanging_x, speed, isvisible);
 			draw_obstacle_hanging(hanging_x, 0xFFFF);
-			update_position_hanging(&hanging_x, speed, &isvisible);
-		}
+		} 
+		
 		wait_for_vsync(); // swap front and back buffers on VGA vertical sync
 		pixel_buffer_start = *(pixel_ctrl_ptr+1);
+		if(collision_detection(y_box_for_square, triangle_x, obstacle_box_x, spike_x, hanging_x)) {
+			alive = false;
+		}
 	}
+	pixel_buffer_start= *(pixel_ctrl_ptr);
+	draw_game_over_screen();
+}
+void draw_game_over_screen() {
+	for (int i=0; i<320; i++) {
+        for (int j=0; j<120; j++ ) {
+	    	plot_pixel(i,j,0xFF00);
+		}
+	}
+}
+bool collision_detection(int y_box_for_square[], int triangle_x, int obstacle_box_x, int spike_x, int hanging_x) {
+	if(triangle_x < 20 && y_box_for_square[0] > 199 - 10 - 20) {
+		return true;
+	}
+	if(obstacle_box_x < 20 && y_box_for_square[0] > 199 - 20 - 20) {
+		return true;
+	}
+	if(spike_x < 20 && y_box_for_square[0] > 199 - 12 - 20) {
+		return true;
+	}
+	if(hanging_x < 20 && y_box_for_square[0] < 199 - 25 ) {
+		return true; 
+	}
+	return false;
 }
 void update_position_for_player() {
 	if (isjumping) {
@@ -350,7 +383,9 @@ void pushbutton_ISR(void)
 }
 // done with jump
 void jump () {
-	isjumping= true; 	
+	if(y_box_for_square[0] > 178) {
+		isjumping= true; 	
+	}
 }
 // fill in
 void draw_square_player(int x_box[], int y_box[], int color_box[]) {
@@ -393,14 +428,13 @@ void draw_triangle_barrier(int triangle_x, int triangle_y, int trianglesize, int
 	draw_line(triangle_x-trianglesize+1, triangle_y-1, triangle_x-(trianglesize)/2, triangle_y-trianglesize, color_box[3]);
 }
 
-void update_position_for_triangle(int* triangle_x, int* triangle_y, int trianglesize, bool* isvisible[],  int change_in_pos) { 
+void update_position_for_triangle(int* triangle_x, int* triangle_y, int trianglesize, bool isvisible[],  int change_in_pos) { 
 	int leftcenterx = (*triangle_x) - trianglesize + 1;
-	if (leftcenterx < 2) {
-		(*isvisible[0]) = false; 	
+	(*triangle_x)=(*triangle_x)-change_in_pos;
+	if (leftcenterx < 2)  {
+		(*triangle_x) = 319 - 20;
 	}
-	if(isvisible[0]) {
-		(*triangle_x)=(*triangle_x)-change_in_pos;
-	}
+	
 }
 
 void draw_obstacle_hanging(int hanging_x, int colour){
@@ -419,14 +453,18 @@ void draw_obstacle_hanging(int hanging_x, int colour){
 	}
 }
 
-void update_position_hanging(int *hanging_x, int speed, bool *isvisible[]){
+void update_position_hanging(int *hanging_x, int speed, bool isvisible[]){
 	*hanging_x= *hanging_x - speed;
-	if (hanging_x < 0) *isvisible[3] = false;
+	if (*hanging_x < 0) {
+		(*hanging_x)= 319 -20;
+	}
 }
 
-void update_position_single_block(int *obstacle_box_x, int speed, bool *isvisible[]){
+void update_position_single_block(int *obstacle_box_x, int speed, bool isvisible[]){
 	*obstacle_box_x= *obstacle_box_x - speed;
-	if (obstacle_box_x < 0) *isvisible[1] = false;
+	if (*obstacle_box_x < 0) {
+		(*obstacle_box_x) = 319-20;
+	}
 }
 
 void draw_obstacle_single_block(int obstacle_box_x, int colour){
@@ -455,9 +493,11 @@ void draw_obstacle_spikes(int spike_x, int colour){
 	}
 }
 
-void update_position_spikes(int *spike_x, int speed, bool *isvisible[]){
+void update_position_spikes(int *spike_x, int speed, bool isvisible[]){
 	*spike_x= *spike_x - speed;
-	if (spike_x < 0) *isvisible[2] = false;
+	if (*spike_x < 0) {
+		(*spike_x) = 319 - 20;
+	}
 }
 
 //Draw ground with a white line for clarity
