@@ -111,6 +111,7 @@ void draw_background();
 void draw();
 int  x_box_for_square[20], y_box_for_square[20];
 bool isjumping;
+bool startGame = false;
 void pushbutton_ISR(void);
 void jump ();
 void draw_obstacle_single_block(int obstacle_box_x, int colour);
@@ -123,6 +124,8 @@ void config_interrupt (int L, int CPU_target);
 bool collision_detection(int y_box_for_square[], int triangle_x, int obstacle_box_x, int spike_x, int hanging_x);
 bool alive;
 void draw_game_over_screen();
+void video_text(int x, int y, char * text_ptr);
+
 int main () {
 	//volatile int * HPS_GPIO1_ptr = (int *)HPS_GPIO1_BASE; // GPIO1 base address
 //volatile ; value to turn on the HPS green light LEDG
@@ -142,6 +145,8 @@ int main () {
 	int obstacle_box_x = 319 - 20;
 	int spike_x = 319 - 20;
 	int hanging_x = 319 - 20;
+	char text_top_row[40] = "GEOMETRY DASH\0";
+	char text_bottom_row[40] = "HIT ANY KEY TO START\0";
 	//change_in_pos=4; 
 	bool isvisible [10];
 	for (int i = 1; i <10; i++){
@@ -190,6 +195,14 @@ int main () {
 	//wait_for_vsync();
 	alive = true;
 	while (alive) {
+		if (!startGame){			
+			video_text(35, 28, text_top_row);
+			video_text(32, 31, text_bottom_row);
+		}
+		else {
+			video_text(35, 28, "                     ");
+			video_text(32, 31, "                     ");
+		
 		//clear_screen_for_triangle(triangle_x, triangle_y, trianglesize); 	/* Erase any boxes and lines that were drawn in the last iteration */
 		draw();
 		draw_square_player(x_box_for_square, y_box_for_square, color_box);
@@ -222,6 +235,7 @@ int main () {
 		if(collision_detection(y_box_for_square, triangle_x, obstacle_box_x, spike_x, hanging_x)) {
 			alive = false;
 		}
+	}
 	}
 	pixel_buffer_start= *(pixel_ctrl_ptr);
 	draw_game_over_screen();
@@ -378,7 +392,9 @@ void pushbutton_ISR(void)
 	int press;
 	press = *(KEY_ptr + 3); // read the pushbutton interrupt register
 	*(KEY_ptr + 3) = press; // Clear the interrupt
-	jump();
+	
+	if (startGame == true) jump();
+	else startGame = true;
 	return;
 }
 // done with jump
@@ -475,6 +491,20 @@ void draw_obstacle_single_block(int obstacle_box_x, int colour){
 			}
 		}
 	//}
+}
+
+void video_text(int x, int y, char * text_ptr) {
+	int offset;
+	volatile char * character_buffer =
+	(char *)FPGA_CHAR_BASE; // video character buffer
+	/* assume that the text string fits on one line */
+	offset = (y << 7) + x;
+	while (*(text_ptr)) {
+		*(character_buffer + offset) =
+		*(text_ptr); // write to the character buffer
+		++text_ptr;
+		++offset;
+	}
 }
 
 void draw_obstacle_spikes(int spike_x, int colour){
@@ -588,7 +618,7 @@ void initialize_background(){
 	}
 }
 
-//Rotate left by 1
+//Rotate left by 8
 void rotate_left(int array[M][N])
 {
 	int total_size = M*N;
@@ -630,10 +660,6 @@ void draw_background(){
 			}
 		}
 	}
-	
-	//Pretty choppy, only erase what's necessary
-	//Rotating the background left to move 
-
 	rotate_left(background);
 	
 }
