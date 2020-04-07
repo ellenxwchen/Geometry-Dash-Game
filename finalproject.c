@@ -493,20 +493,20 @@ const lv_img_dsc_t game_over = {
 		update_position_for_triangle(&triangle_x, &triangle_y, trianglesize, isvisible, speed);
 		draw_triangle_barrier(triangle_x, triangle_y, trianglesize, color_box); 
 		// set distances between obstacles
-		if ( triangle_x <= 319- 100 ) isvisible[1] = true;
+		if ( triangle_x <= 319- 200) isvisible[1] = true;
 		
 		if(isvisible[1]) {
 			//draw_obstacle_single_block(obstacle_box_x, 0x443E);
 			update_position_single_block(&obstacle_box_x, speed, isvisible);
 			draw_obstacle_single_block(obstacle_box_x, 0xFFFF);
 		// set distances between obstacles 	
-			if (obstacle_box_x <=319 - 100) isvisible[2] = true;
+			if (obstacle_box_x <=319 - 200) isvisible[2] = true;
 		}
 		if (isvisible[2]){
 			update_position_spikes(&spike_x, speed, isvisible);
 			draw_obstacle_spikes(spike_x, 0xFFFF);
 		// set distances between obstacles	
-			if (spike_x <=319 - 100) isvisible[3] = true;
+			if (spike_x <=319 - 200) isvisible[3] = true;
 		}
 		if (isvisible[3]){
 			update_position_hanging(&hanging_x, speed, isvisible);
@@ -605,15 +605,15 @@ bool collision_detection(int y_box_for_square[], int triangle_x, int obstacle_bo
 void update_position_for_player() {
 	if (isjumping) {
 		for (int i=0; i<20; i++) {
-			y_box_for_square[i] = y_box_for_square[i] -10;
+			y_box_for_square[i] = y_box_for_square[i] -20;
 		}
-		if (y_box_for_square[0] < 159) {
+		if (y_box_for_square[0] < 139) {
 			isjumping=false; 	
 		}
 	}
 	else if(y_box_for_square[0] < 179) {
 		for (int i=0; i<20; i++) {
-			y_box_for_square[i] = y_box_for_square[i] +10;
+			y_box_for_square[i] = y_box_for_square[i] +20;
 		}
 	}
 }
@@ -1207,3 +1207,5 @@ void wait_for_vsync() {
 	}
 }
 
+
+	
