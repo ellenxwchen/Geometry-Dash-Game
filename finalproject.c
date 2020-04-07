@@ -360,6 +360,7 @@ void rotate_left(int array[M][N]);
 void draw_background();
 void draw();
 int  x_box_for_square[20], y_box_for_square[20];
+int loopNumber = 0;
 bool isjumping;
 bool gameOver = false;
 void pushbutton_ISR(void);
@@ -403,7 +404,7 @@ const lv_img_dsc_t game_over = {
 	volatile int * pixel_ctrl_ptr = (int *)0xFF203020;
 	int color_box[8]; 
 	short color[6] = {0xFFFF, 0xF800, 0x07E0, 0x001F, 0x000F, 0x010F};
-	int triangle_x=319, triangle_y=199, trianglesize, change_in_pos=1;
+	int triangle_x=319, triangle_y=198, trianglesize, change_in_pos=1;
 	trianglesize=10;
 	int obstacle_box_x = 319 - 20;
 	int spike_x = 319 - 20;
@@ -424,8 +425,9 @@ const lv_img_dsc_t game_over = {
 	wait_for_vsync();
 	initialize_background();
 	pixel_buffer_start = *(pixel_ctrl_ptr);
-	clear_screen();
-	/* now, swap the front/back buffers, to set the front buffer location */
+	//clear_screen();
+	memset((short int*) pixel_buffer_start, 0, 245760 ); 
+	 /* now, swap the front/back buffers, to set the front buffer location */
    // wait_for_vsync();
     /* initialize a pointer to the pixel buffer, used by drawing functions */
    // pixel_buffer_start = *pixel_ctrl_ptr;
@@ -466,17 +468,35 @@ const lv_img_dsc_t game_over = {
 		}
 		else{
 		if (alive == true && gameOver == false){
+			if (loopNumber == 0){
+				
+				draw_background();
+				draw_ground();
+				wait_for_vsync();
+				pixel_buffer_start = *(pixel_ctrl_ptr+1);
+				draw_background();
+				draw_ground();
+				loopNumber ++;
+			}
+		loopNumber ++;
+		char c[40];
+		sprintf (c, "%d", loopNumber);
+		char text_bottom_row[40] = "SCORE: ";
+		video_text(0, 0, text_bottom_row);
+		video_text(7, 0, c);
 		clear_character();
-		draw();
+		draw_background();
 		draw_square_player(x_box_for_square, y_box_for_square, color_box);
 		update_position_for_player();
 		// next time I draw it the position of the square will be different	
+		//clear_screen_for_triangle(triangle_x, triangle_y, trianglesize); 
 		update_position_for_triangle(&triangle_x, &triangle_y, trianglesize, isvisible, speed);
 		draw_triangle_barrier(triangle_x, triangle_y, trianglesize, color_box); 
 		// set distances between obstacles
 		if ( triangle_x <= 319- 100 ) isvisible[1] = true;
 		
 		if(isvisible[1]) {
+			//draw_obstacle_single_block(obstacle_box_x, 0x443E);
 			update_position_single_block(&obstacle_box_x, speed, isvisible);
 			draw_obstacle_single_block(obstacle_box_x, 0xFFFF);
 		// set distances between obstacles 	
@@ -493,7 +513,6 @@ const lv_img_dsc_t game_over = {
 			draw_obstacle_hanging(hanging_x, 0xFFFF);
 		} 
 		
-		
 		if(collision_detection(y_box_for_square, triangle_x, obstacle_box_x, spike_x, hanging_x)) {
 			alive = false;
 			gameOver = true;
@@ -501,7 +520,7 @@ const lv_img_dsc_t game_over = {
 	}
 	else{
 		draw_game_over_screen();
-		triangle_x=319, triangle_y=199, trianglesize, change_in_pos=1;
+		triangle_x=319, triangle_y=198, trianglesize, change_in_pos=1;
 		trianglesize=10;
 		obstacle_box_x = 319 - 20;
 		spike_x = 319 - 20;
@@ -527,20 +546,22 @@ void clear_character(){
 
 void draw_game_over_screen() {
 	char text_top_row[40] = "GAME OVER\0";
-	char text_bottom_row[40] = "SCORE: \0";
+	char c[40];
+	sprintf (c, "%d", loopNumber);
+	char text_bottom_row[40] = "SCORE: ";
+	
 	char text_last_row[40] = "PRESS ANY KEY TO RESTART! \0";
-	for (int i=0; i<320; i++) {
-        for (int j=0; j<240; j++) {
-			plot_pixel(i,j,0);
-		}
-	}
+	memset((short int*) pixel_buffer_start, 0, 245760 ); 
 	video_text(35, 28, text_top_row);
 	video_text(35, 31, text_bottom_row);
+	video_text(42, 31, c);
 	video_text(28, 34, text_last_row);
+	video_text(0, 0, "                             ");
 }
 
 void draw_game_start_screen() {
 	clear_character();
+	video_text(0, 0, "                             ");
 	int i = 0, j = 0;
 
     for (int k = 0; k < 320 * 2 * 240 - 1; k += 2) {
@@ -722,6 +743,7 @@ void pushbutton_ISR(void)
 		gameOver = false;
 		alive = true;
 	    clear_character();
+		loopNumber = 0;
 	}
 	return;
 }
@@ -1079,23 +1101,22 @@ void draw_background(){
 	//Drawing the whole background
 	for (int x = 0; x<=319;x++){
 		for (int y = 0; y<=198; y++){
-			if (background[y][x] == 1){
+			//if (background[y][x] == 1){
 				plot_pixel(x,y,0x443E);
-			}
+			//}
 		}
 	}
 	
 	//Pretty choppy, only erase what's necessary
 	//Rotating the background left to move 
 
-	rotate_left(background);
+	//rotate_left(background);
 	
 }
 
 void draw(){
-	clear_screen();
+	memset((short int*) pixel_buffer_start, 0, 245760 ); 
 	draw_ground();
-	draw_background();
 }
 
 void draw_square(int x, int y, short int line_color){
