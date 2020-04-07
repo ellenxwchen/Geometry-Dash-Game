@@ -951,7 +951,7 @@ void initialize_background(){
 // m is y n is x 
 void rotate_left(int array[M][N]) 
 {
-	int temparray[M][N]; 
+	/*int temparray[M][N]; 
 	for (int x = 0; x<319;x++){
 		for (int y = 0; y<198; y++){
 			if (x >= speed){
@@ -976,7 +976,74 @@ void rotate_left(int array[M][N])
 		for(int y =0; y<198; y++) {
 			array[y][x]=temparray[y][x];
 		}
+	} */
+	
+	int total_size = M*N;
+	 int *cast_array = (int *)array;
+    int temp0 = cast_array[0];
+	int temp1 = cast_array[1];
+	int temp2 = cast_array[2];
+	int temp3 = cast_array[3];
+	int temp4 = cast_array[4];
+	int temp5 = cast_array[5];
+	int temp6 = cast_array[6];
+	int temp7 = cast_array[7];
+	int temp8 = cast_array[8];
+	int temp9 = cast_array[9];
+	int temp10 = cast_array[10];
+	int temp11= cast_array[11];
+	int temp12 = cast_array[12];
+	int temp13 = cast_array[13];
+	int temp14 = cast_array[14];
+	int temp15 = cast_array[15];
+	int temp16 = cast_array[16];
+	int temp17 = cast_array[17];
+	int temp18 = cast_array[18];
+	int temp19 = cast_array[19];
+	 for ( size_t i = speed; i < total_size -(speed); i=i+speed ){
+        cast_array[i-speed] = cast_array[i];
+		cast_array[i-speed+1] = cast_array[i+1];
+		cast_array[i-speed+2] = cast_array[i+2];
+		cast_array[i-speed+3] = cast_array[i+3];
+		cast_array[i-speed+4] = cast_array[i+4];
+		cast_array[i-speed+5] = cast_array[i+5];
+		cast_array[i-speed+6] = cast_array[i+6];
+		cast_array[i-speed+7] = cast_array[i+7];
+		cast_array[i-speed+8] = cast_array[i+8];
+		cast_array[i-speed+9] = cast_array[i+9];
+		cast_array[i-speed+10] = cast_array[i+10];
+		cast_array[i-speed+11] = cast_array[i+11];
+		cast_array[i-speed+12] = cast_array[i+12];
+		cast_array[i-speed+13] = cast_array[i+13];
+		cast_array[i-speed+14] = cast_array[i+14];
+		cast_array[i-speed+15] = cast_array[i+15];
+		cast_array[i-speed+16] = cast_array[i+16];
+		cast_array[i-speed+17] = cast_array[i+17];
+		cast_array[i-speed+18] = cast_array[i+18];
+		cast_array[i-speed+19] = cast_array[i+19];
 	}
+	
+	cast_array[total_size-1] = temp19;
+	cast_array[total_size-2] = temp18;
+	cast_array[total_size-3] = temp17;
+	cast_array[total_size-4] = temp16;
+	cast_array[total_size-5] = temp15;
+	cast_array[total_size-6] = temp14;
+	cast_array[total_size-7] = temp13;
+	cast_array[total_size-8] = temp12;
+	cast_array[total_size-9] = temp11;
+	cast_array[total_size-10] = temp10;
+	cast_array[total_size-11] = temp9;
+	cast_array[total_size-12] = temp8;
+	cast_array[total_size-13] = temp7;
+	cast_array[total_size-14] = temp6;
+	cast_array[total_size-15] = temp5;
+	cast_array[total_size-16] = temp4;
+	cast_array[total_size-17] = temp3;
+	cast_array[total_size-18] = temp2;
+	cast_array[total_size-19] = temp1;
+	cast_array[total_size-20] = temp0;
+	
 	/*
 	int total_size = M*N;
     int *cast_array = (int *)array;
@@ -1118,3 +1185,4 @@ void wait_for_vsync() {
 		status = *(pixel_ctrl_ptr +3 );
 	}
 }
+
