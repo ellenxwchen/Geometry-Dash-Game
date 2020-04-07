@@ -4,6 +4,9 @@
 
 
 /* This files provides address values that exist in the system */
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 #define BOARD                 "DE1-SoC"
 //#include "address_map_arm.h"
@@ -66,16 +69,15 @@
 #define ICDIPTR               0x800         // offset to interrupt processor targets regs
 #define ICDICFR               0xC00         // offset to interrupt configuration regs
 
-#define M 199 
-#define N 319
-	
+#define M 199 // y
+#define N 319 // x
+#define INTRO 0
+#define JUMP 1
 int background [M][N];
-int speed =20;
+int speed = 20;
 	
 volatile int pixel_buffer_start; // global variable
-#include <stdbool.h>
-#include <stdio.h>
-#include <stdlib.h>
+
 // interrupt code
 void set_A9_IRQ_stack(void);
 void config_GIC(void);
@@ -94,6 +96,7 @@ volatile int pattern = 0x0F0F0F0F; // pattern for LED lights
 extern volatile int key_dir;
 extern volatile int pattern;
 // 
+volatile int game_state = 0;
 void update_position_for_player();
 void clear_screen();
 void clear_screen_for_triangle(int triangle_x, int triangle_y, int trianglesize); 
@@ -111,7 +114,6 @@ void draw_background();
 void draw();
 int  x_box_for_square[20], y_box_for_square[20];
 bool isjumping;
-bool startGame = false;
 void pushbutton_ISR(void);
 void jump ();
 void draw_obstacle_single_block(int obstacle_box_x, int colour);
@@ -124,8 +126,18 @@ void config_interrupt (int L, int CPU_target);
 bool collision_detection(int y_box_for_square[], int triangle_x, int obstacle_box_x, int spike_x, int hanging_x);
 bool alive;
 void draw_game_over_screen();
-void video_text(int x, int y, char * text_ptr);
+// image
 
+/*
+const lv_img_dsc_t game_over = {
+  .header.always_zero = 0,
+  .header.w = 261,
+  .header.h = 199,
+  .data_size = 51939 * LV_COLOR_SIZE / 8,
+  .header.cf = LV_IMG_CF_TRUE_COLOR,
+  .data = game_over_map,
+};
+ */ 
 int main () {
 	//volatile int * HPS_GPIO1_ptr = (int *)HPS_GPIO1_BASE; // GPIO1 base address
 //volatile ; value to turn on the HPS green light LEDG
@@ -145,8 +157,6 @@ int main () {
 	int obstacle_box_x = 319 - 20;
 	int spike_x = 319 - 20;
 	int hanging_x = 319 - 20;
-	char text_top_row[40] = "GEOMETRY DASH\0";
-	char text_bottom_row[40] = "HIT ANY KEY TO START\0";
 	//change_in_pos=4; 
 	bool isvisible [10];
 	for (int i = 1; i <10; i++){
@@ -193,16 +203,12 @@ int main () {
 	}
 	//draw_square_player(x_box_for_square, y_box_for_square, color_box); // draw the square player 
 	//wait_for_vsync();
+	draw_game_start_screen();
+	while (game_state == INTRO) {
+	
+	}
 	alive = true;
 	while (alive) {
-		if (!startGame){			
-			video_text(35, 28, text_top_row);
-			video_text(32, 31, text_bottom_row);
-		}
-		else {
-			video_text(35, 28, "                     ");
-			video_text(32, 31, "                     ");
-		
 		//clear_screen_for_triangle(triangle_x, triangle_y, trianglesize); 	/* Erase any boxes and lines that were drawn in the last iteration */
 		draw();
 		draw_square_player(x_box_for_square, y_box_for_square, color_box);
@@ -236,14 +242,21 @@ int main () {
 			alive = false;
 		}
 	}
-	}
 	pixel_buffer_start= *(pixel_ctrl_ptr);
 	draw_game_over_screen();
 }
 void draw_game_over_screen() {
 	for (int i=0; i<320; i++) {
-        for (int j=0; j<120; j++ ) {
-	    	plot_pixel(i,j,0xFF00);
+        for (int j=0; j<240; j++) {
+			plot_pixel(i,j,0);
+		}
+	}
+}
+void draw_game_start_screen() {
+	int k=0;
+	for (int i=0; i<320; i++) {
+        for (int j=0; j<200; j++) {
+			plot_pixel(i,j,0);
 		}
 	}
 }
@@ -265,7 +278,7 @@ bool collision_detection(int y_box_for_square[], int triangle_x, int obstacle_bo
 void update_position_for_player() {
 	if (isjumping) {
 		for (int i=0; i<20; i++) {
-			y_box_for_square[i] = y_box_for_square[i] -1;
+			y_box_for_square[i] = y_box_for_square[i] -10;
 		}
 		if (y_box_for_square[0] < 159) {
 			isjumping=false; 	
@@ -273,7 +286,7 @@ void update_position_for_player() {
 	}
 	else if(y_box_for_square[0] < 179) {
 		for (int i=0; i<20; i++) {
-			y_box_for_square[i] = y_box_for_square[i] +1;
+			y_box_for_square[i] = y_box_for_square[i] +10;
 		}
 	}
 }
@@ -392,9 +405,12 @@ void pushbutton_ISR(void)
 	int press;
 	press = *(KEY_ptr + 3); // read the pushbutton interrupt register
 	*(KEY_ptr + 3) = press; // Clear the interrupt
-	
-	if (startGame == true) jump();
-	else startGame = true;
+	if(game_state == INTRO) {
+		game_state=JUMP;
+	}
+	else if (game_state == JUMP) {
+		jump();
+	}
 	return;
 }
 // done with jump
@@ -491,20 +507,6 @@ void draw_obstacle_single_block(int obstacle_box_x, int colour){
 			}
 		}
 	//}
-}
-
-void video_text(int x, int y, char * text_ptr) {
-	int offset;
-	volatile char * character_buffer =
-	(char *)FPGA_CHAR_BASE; // video character buffer
-	/* assume that the text string fits on one line */
-	offset = (y << 7) + x;
-	while (*(text_ptr)) {
-		*(character_buffer + offset) =
-		*(text_ptr); // write to the character buffer
-		++text_ptr;
-		++offset;
-	}
 }
 
 void draw_obstacle_spikes(int spike_x, int colour){
@@ -618,9 +620,37 @@ void initialize_background(){
 	}
 }
 
-//Rotate left by 20, there's probably an easier way to do it lol
-void rotate_left(int array[M][N])
+//Rotate left by 1
+// m is y n is x 
+void rotate_left(int array[M][N]) 
 {
+	int temparray[M][N]; 
+	for (int x = 0; x<319;x++){
+		for (int y = 0; y<198; y++){
+			if (x >= speed){
+				if (x-speed <0) {
+					while(1) {
+					
+					}
+				}
+				temparray[y][x-speed] = array[y][x];			
+			}
+			else {
+				if(x+318-speed > 318) {
+					while (1) {
+					
+					}
+				}
+				temparray[y][x+318-speed] = array[y][x];
+			}
+		}
+	}
+	for(int x = 0; x<319;x++) {
+		for(int y =0; y<198; y++) {
+			array[y][x]=temparray[y][x];
+		}
+	}
+	/*
 	int total_size = M*N;
     int *cast_array = (int *)array;
     int temp0 = cast_array[0];
@@ -631,19 +661,7 @@ void rotate_left(int array[M][N])
 	int temp5 = cast_array[5];
 	int temp6 = cast_array[6];
 	int temp7 = cast_array[7];
-	int temp8 = cast_array[8];
-	int temp9 = cast_array[9];
-	int temp10 = cast_array[10];
-	int temp11= cast_array[11];
-	int temp12 = cast_array[12];
-	int temp13 = cast_array[13];
-	int temp14 = cast_array[14];
-	int temp15 = cast_array[15];
-	int temp16 = cast_array[16];
-	int temp17 = cast_array[17];
-	int temp18 = cast_array[18];
-	int temp19 = cast_array[19];
-    for ( size_t i = speed; i < total_size -(speed-1); i=i+speed ){
+    for ( size_t i = speed; i < total_size -(speed); i=i+speed ){
         cast_array[i-speed] = cast_array[i];
 		cast_array[i-speed+1] = cast_array[i+1];
 		cast_array[i-speed+2] = cast_array[i+2];
@@ -652,41 +670,17 @@ void rotate_left(int array[M][N])
 		cast_array[i-speed+5] = cast_array[i+5];
 		cast_array[i-speed+6] = cast_array[i+6];
 		cast_array[i-speed+7] = cast_array[i+7];
-		cast_array[i-speed+8] = cast_array[i+8];
-		cast_array[i-speed+9] = cast_array[i+9];
-		cast_array[i-speed+10] = cast_array[i+10];
-		cast_array[i-speed+11] = cast_array[i+11];
-		cast_array[i-speed+12] = cast_array[i+12];
-		cast_array[i-speed+13] = cast_array[i+13];
-		cast_array[i-speed+14] = cast_array[i+14];
-		cast_array[i-speed+15] = cast_array[i+15];
-		cast_array[i-speed+16] = cast_array[i+16];
-		cast_array[i-speed+17] = cast_array[i+17];
-		cast_array[i-speed+18] = cast_array[i+18];
-		cast_array[i-speed+19] = cast_array[i+19];
 	}
-    cast_array[total_size-1] = temp19;
-	cast_array[total_size-2] = temp18;
-	cast_array[total_size-3] = temp17;
-	cast_array[total_size-4] = temp16;
-	cast_array[total_size-5] = temp15;
-	cast_array[total_size-6] = temp14;
-	cast_array[total_size-7] = temp13;
-	cast_array[total_size-8] = temp12;
-	cast_array[total_size-9] = temp11;
-	cast_array[total_size-10] = temp10;
-	cast_array[total_size-11] = temp9;
-	cast_array[total_size-12] = temp8;
-	cast_array[total_size-13] = temp7;
-	cast_array[total_size-14] = temp6;
-	cast_array[total_size-15] = temp5;
-	cast_array[total_size-16] = temp4;
-	cast_array[total_size-17] = temp3;
-	cast_array[total_size-18] = temp2;
-	cast_array[total_size-19] = temp1;
-	cast_array[total_size-20] = temp0;
+    cast_array[total_size-1] = temp7;
+	cast_array[total_size-2] = temp6;
+	cast_array[total_size-3] = temp5;
+	cast_array[total_size-4] = temp4;
+	cast_array[total_size-5] = temp3;
+	cast_array[total_size-6] = temp2;
+	cast_array[total_size-7] = temp1;
+	cast_array[total_size-8] = temp0;
+	*/
 }
-
 void draw_background(){
 	//Drawing the whole background
 	for (int x = 0; x<=319;x++){
@@ -696,6 +690,10 @@ void draw_background(){
 			}
 		}
 	}
+	
+	//Pretty choppy, only erase what's necessary
+	//Rotating the background left to move 
+
 	rotate_left(background);
 	
 }
