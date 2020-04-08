@@ -677,7 +677,7 @@ void update_position_for_player() {
 	if (isjumping) {
 		for (int i=0; i<20; i++) {
 			old_y_value_player[i] = y_box_for_square[i];
-			y_box_for_square[i] = y_box_for_square[i] -10;
+			y_box_for_square[i] = y_box_for_square[i] -3;
 			
 		}
 		if (y_box_for_square[0] < 139) {
@@ -687,7 +687,7 @@ void update_position_for_player() {
 	else if(y_box_for_square[0] < 179) {
 		for (int i=0; i<20; i++) {
 			old_y_value_player[i] = y_box_for_square[i];
-			y_box_for_square[i] = y_box_for_square[i] +10;
+			y_box_for_square[i] = y_box_for_square[i] +3;
 		}
 	}
 }
@@ -1250,6 +1250,5 @@ void wait_for_vsync() {
 		status = *(pixel_ctrl_ptr +3 );
 	}
 }
-
 
 	
