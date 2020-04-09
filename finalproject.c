@@ -333,6 +333,7 @@ volatile int * PS2_ptr = (int *)PS2_BASE;
 
 // interrupt code
 void set_A9_IRQ_stack(void);
+// configure gic and keys
 void config_GIC(void);
 void config_KEYs(void);
 void enable_A9_interrupts(void);
@@ -345,7 +346,7 @@ volatile int pattern = 0x0F0F0F0F; // pattern for LED lights
 
 extern volatile int key_dir;
 extern volatile int pattern;
-
+// function prototypes
 volatile int game_state = 0;
 void update_position_for_player();
 void clear_screen_for_triangle(int triangle_x, int triangle_y, int trianglesize, int erase_colour);
@@ -354,7 +355,7 @@ void plot_pixel(int x, int y, short int line_color);
 void wait_for_vsync();
 void draw_square_player(int x_box[], int y_box[], int color_box[]);
 void draw_square(int x, int y, short int line_color);
-void draw_triangle_barrier(int triangle_x, int triangle_y, int trianglesize, int color_box[]);
+void draw_triangle_barrier(int triangle_x, int triangle_y, int trianglesize, int color);
 void update_position_for_triangle(int* triangle_x, int* triangle_y, int trianglesize, bool isvisible[], int change_in_pos);
 void draw_ground();
 void draw_background();
@@ -379,8 +380,8 @@ void draw_game_over_screen();
 void video_text(int x, int y, char * text_ptr);
 void clear_character();
 void erase_player(int x_box[], int y_box[], int colour);
-void draw_background_level_1();
 void draw_background_level_2();
+void draw_background_level_3();
 void clear_char_start();
 void key_press();
 
@@ -447,7 +448,7 @@ void key_press();
 		//Sets speed and LED on depending on which switches are on
 		if 	(SW_value == 1){
 			*(LEDR_ptr) = 0x1;
-			speed = 3;
+			speed = 4;
 		}
 		if 	(SW_value == 2){
 			*(LEDR_ptr) = 0x2;
@@ -495,13 +496,13 @@ void key_press();
 			if (loopNumber == 0){
 				//Sets speed, background/erase colour depending on switches
 				if (SW_value == 1){
-					speed = 3;
-					draw_background_level_1();
+					speed = 4;
+					draw_background_level_2();
 					erase_colour = 0x901F; //background colour of level 2
 				}
 				else if (SW_value == 2){
 					speed = 5;
-					draw_background_level_2();
+					draw_background_level_3();
 					erase_colour = 0x0361; //background colour of level 3
 				}
 				else{
@@ -515,10 +516,10 @@ void key_press();
 				wait_for_vsync();
 				pixel_buffer_start = *(pixel_ctrl_ptr+1);
 				if (SW_value == 1){
-					draw_background_level_1();
+					draw_background_level_2();
 				}
 				else if (SW_value == 2){
-					draw_background_level_2();
+					draw_background_level_3();
 				}
 				else{
 					draw_background();
@@ -540,19 +541,22 @@ void key_press();
 			if (*(pixel_ctrl_ptr + 1) == 0xC0000000){
 				//Increase score
 				loopNumber ++;
+				// erase player first, then update positions, then draw the player 
 				erase_player(x_box_for_square, y_box_for_square, erase_colour);
 				update_position_for_player();
 				draw_square_player(x_box_for_square, y_box_for_square, color_box);
 				if(isvisible[0]) {
+					// clear screen for triangle, update and then draw if visible 
 					clear_screen_for_triangle(triangle_x + speed, triangle_y, trianglesize, erase_colour);
 					update_position_for_triangle(&triangle_x, &triangle_y, trianglesize, isvisible, speed);
 					if(isvisible[0]) {
-						draw_triangle_barrier(triangle_x, triangle_y, trianglesize, color_box);
+						draw_triangle_barrier(triangle_x, triangle_y, trianglesize, 0xFFFF);
 					}
 					//When the previous obstacle is at a certain distance, the next obstacle will appear
 					if (triangle_x <= X_COOR_RIGHT_EDGE- distance_first_buffer) isvisible[1] = true;
 				}
 				if(isvisible[1]) {
+					// always do erase, update, then draw
 					draw_obstacle_single_block(obstacle_box_x + speed, erase_colour);
 					update_position_single_block(&obstacle_box_x, speed, isvisible);
 					if(isvisible[1]) {
@@ -562,6 +566,7 @@ void key_press();
 					if (obstacle_box_x <=X_COOR_RIGHT_EDGE - distance_first_buffer) isvisible[2] = true;
 				}
 				if (isvisible[2]){
+					// always do erase, update, then draw
 					draw_obstacle_spikes(spike_x + speed, erase_colour);
 					update_position_spikes(&spike_x, speed, isvisible);
 					if(isvisible[2]) {
@@ -571,6 +576,7 @@ void key_press();
 					if (spike_x <=X_COOR_RIGHT_EDGE - distance_first_buffer) isvisible[3] = true;
 				}
 				if (isvisible[3]){
+					// always do erase, update, then draw
 					draw_obstacle_hanging(hanging_x + speed, erase_colour);
 					if(hanging_x - speed < 0) { // Immediately erase from front buffer
 						pixel_buffer_start = *(pixel_ctrl_ptr);
@@ -589,11 +595,12 @@ void key_press();
 				update_position_for_player();
 				draw_square_player(x_box_for_square, y_box_for_square, color_box);
 				// next time I draw it the position of the square will be different
-				if(isvisible[0]) {
+				if(isvisible[0]) {// always do erase, update, then draw
+					// always do erase, update, then draw
 					clear_screen_for_triangle(triangle_x + speed, triangle_y, trianglesize, erase_colour);
 					update_position_for_triangle(&triangle_x, &triangle_y, trianglesize, isvisible, speed);
 					if(isvisible[0]) {
-						draw_triangle_barrier(triangle_x, triangle_y, trianglesize, color_box);
+						draw_triangle_barrier(triangle_x, triangle_y, trianglesize, 0xFFFF);
 					}
 					//When the previous obstacle is at a certain distance, the next obstacle will appear
 					if ( triangle_x <= X_COOR_RIGHT_EDGE- distance_second_buffer) isvisible[1] = true;
@@ -602,15 +609,18 @@ void key_press();
 				
 				
 				if(isvisible[1]) {
+					// always do erase, update, then draw
 					draw_obstacle_single_block(obstacle_box_x + speed, erase_colour);
 					update_position_single_block(&obstacle_box_x, speed, isvisible);
 					if(isvisible[1]) {
+						// always use the color oxffff as it's the color we decide on
 						draw_obstacle_single_block(obstacle_box_x, 0xFFFF);
 					}
 					//When the previous obstacle is at a certain distance, the next obstacle will appear
 					if (obstacle_box_x <=X_COOR_RIGHT_EDGE - distance_second_buffer) isvisible[2] = true;
 				}
 				if (isvisible[2]){
+					// always do erase, update, then draw
 					draw_obstacle_spikes(spike_x + speed, erase_colour);
 					update_position_spikes(&spike_x, speed, isvisible);
 					if(isvisible[2]) {
@@ -620,6 +630,7 @@ void key_press();
 					if (spike_x <=X_COOR_RIGHT_EDGE - distance_second_buffer) isvisible[3] = true;
 				}
 				if (isvisible[3]){
+					// always do erase, update, then draw
 					draw_obstacle_hanging(hanging_x + speed, erase_colour);
 					if(hanging_x - speed < 0) { // Immediately erase from front buffer
 						pixel_buffer_start = *(pixel_ctrl_ptr);
@@ -661,12 +672,15 @@ void key_press();
 }
 
 void key_press(){
+	// key press function 
+	// changing game states based on previous game states
 	if(game_state == INTRO) {
 		game_state=JUMP;
 	}
 	else if (game_state == JUMP && gameOver == false) {
 		jump();
 	}
+	// prepare for the next round
 	if (gameOver){
 		alive = true;
 	   	clear_character();
@@ -675,7 +689,8 @@ void key_press(){
 	}
 }
 
-void draw_background_level_1(){
+//Clearing the background colour to the level 2 backgound colour
+void draw_background_level_2(){
 	for (int x = 0; x<=X_COOR_RIGHT_EDGE;x++){
 		for (int y = 0; y<Y_COOR_GROUND; y++){
 			plot_pixel(x,y,0x901F);
@@ -683,7 +698,9 @@ void draw_background_level_1(){
 	}
 }
 
-void draw_background_level_2(){
+//Clearing the background to the level 3 background colour
+void draw_background_level_3(){
+	
 	for (int x = 0; x<=X_COOR_RIGHT_EDGE;x++){
 		for (int y = 0; y<Y_COOR_GROUND; y++){
 			plot_pixel(x,y,0x0361);
@@ -692,7 +709,8 @@ void draw_background_level_2(){
 }
 
 void erase_player(int x_box[], int y_box[], int erase_colour){
-	for (int x = 0; x < WIDTH_PLAYER; x++){
+	// erase the player based on its dimensions
+	for (int x = 0; x < WIDTH_PLAYER +2 ; x++){
 		for (int y = y_box[0]-5; y <Y_COOR_GROUND; y ++){
 			plot_pixel(x,y,erase_colour);
 		}
@@ -781,25 +799,34 @@ void draw_game_start_screen() {
 
 //Check if player collided with obstacles
 bool collision_detection(int y_box_for_square[], int triangle_x, int obstacle_box_x, int spike_x, int hanging_x, int trianglesize) {
+	// if triangle_x is about to collide with the player
+	// use relative coordinates of the triangle and player to see if they are about to hit 
+	// added some magic numbers just to be safe
 	if(triangle_x -  trianglesize - speed +1 < WIDTH_PLAYER && y_box_for_square[0] + 3> Y_COOR_GROUND - 10 - WIDTH_PLAYER) {
 		return true;
 	}
+	// if obstacle x is about to hit the player
 	if(obstacle_box_x < WIDTH_PLAYER && y_box_for_square[0] > Y_COOR_GROUND - WIDTH_PLAYER - WIDTH_PLAYER) {
 		return true;
 	}
+	// use relative coordinates of the triangle and player to see if they are about to hit 
+	// added some magic numbers just to be safe
+	// 12 is the height of the hanger 
 	if(spike_x < WIDTH_PLAYER && y_box_for_square[0] > Y_COOR_GROUND - 12 - WIDTH_PLAYER) {
 		return true;
 	}
+	// y_coor_ground -25 is where the ahnger is 
 	if(hanging_x < WIDTH_PLAYER && y_box_for_square[0] < Y_COOR_GROUND - 25 ) {
 		return true;
 	}
 	return false;
 }
-
+int jump_down_value = 139; 
+int jump_up_value = 179;
 //Update position for player
 void update_position_for_player() {
 	int jump_speed;
-	if (speed == 5){
+	if (speed >= 5){
 		jump_speed = 4;
 	}
 	else{
@@ -809,11 +836,12 @@ void update_position_for_player() {
 		for (int i=0; i<WIDTH_PLAYER; i++) {
 			y_box_for_square[i] = y_box_for_square[i] - jump_speed; //jump up
 		}
-		if (y_box_for_square[0] < 139) {
+	
+		if (y_box_for_square[0] < jump_down_value) {
 			isjumping=false;
 		}
 	}
-	else if(y_box_for_square[0] < 179) {
+	else if(y_box_for_square[0] < jump_up_value) {
 		for (int i=0; i<WIDTH_PLAYER; i++) {
 			y_box_for_square[i] = y_box_for_square[i] + jump_speed; //falling down
 		}
@@ -821,8 +849,10 @@ void update_position_for_player() {
 }
 void config_KEYs() {
 	volatile int * KEY_ptr = (int *)KEY_BASE; // pushbutton KEY address
-	*(KEY_ptr + 2) = 0xf; // enable interrupts for KEY[1]
+	*(KEY_ptr + 2) = 0xf; // enable interrupts for KEYs
 }
+// mode numbers for IRQ, SVC, enavle and KEYS 
+// interupt code taken from documents 
 int SVC_MODE = 0b10011;
 //int INT_DISABLE = 0b10000000;
 //int INT_ENABLE = 0;
@@ -832,6 +862,7 @@ int KEYS_IRQ = 73;
 
 void enable_A9_interrupts(void)
 {
+	// number 0b01010011 is taken from the example provided in documents
 	int status = 0b01010011;
 	asm("msr cpsr, %[ps]" : : [ps] "r"(status));
 }
@@ -864,6 +895,7 @@ void config_GIC(void)
 * Configure Set Enable Registers (ICDISERn) and Interrupt Processor Target Registers (ICDIPTRn).
 * The default (reset) values are used for other registers in the GIC.
 */
+// copied directly from the document, not required by professor to understand  
 void config_interrupt (int L, int CPU_target)
 {
 	int reg_offset, index, value, address;
@@ -891,11 +923,6 @@ void __attribute__((interrupt)) __cs3_isr_irq(void)
 	// Read the ICCIAR from the processor interface
 	int address = MPCORE_GIC_CPUIF + ICCIAR;
 	int int_ID = *((int *)address);
-	//if (int_ID == HPS_TIMER0_IRQ) // check if interrupt is from the HPS timer
-	//HPS_timer_ISR();
-	//else if (int_ID ==
-	//INTERVAL_TIMER_IRQ) // check if interrupt is from the Altera timer
-	//interval_timer_ISR();
 	if (int_ID == KEYS_IRQ) { // check if interrupt is from the KEYs
 		pushbutton_ISR();
 	}
@@ -914,7 +941,7 @@ void pushbutton_ISR(void)
 	int press;
 	press = *(KEY_ptr + 3); // read the pushbutton interrupt register
 	*(KEY_ptr + 3) = press; // Clear the interrupt
-	
+	// changing game states based 
 	if(game_state == INTRO) {
 		game_state=JUMP;
 	}
@@ -952,13 +979,15 @@ void video_text(int x, int y, char * text_ptr) {
 	}
 }
 
-// fill in
+// fill in the square for drawing the player
+//
 void draw_square_player(int x_box[], int y_box[], int color_box[]) {
 	for(int i=0; i<WIDTH_PLAYER; i++) {
 		for (int j=0; j<WIDTH_PLAYER; j++) {
 			plot_pixel(x_box[i], y_box[j], color_box[0]);
 		}
 	}
+	// draw the boxes on the four edges
 	draw_square(x_box[0]+1, y_box[0]+1,color_box[1]);
 	draw_square(x_box[17]+1, y_box[0]+1,color_box[1]);
 	draw_square(x_box[0]+1, y_box[17]+1, color_box[1]);
@@ -984,13 +1013,13 @@ void draw_square_player(int x_box[], int y_box[], int color_box[]) {
 }
 
 // always pass the bottom right coordinate for triangle
-void draw_triangle_barrier(int triangle_x, int triangle_y, int trianglesize, int color_box[]) {
-	draw_square(triangle_x-1, triangle_y-1, color_box[3]);
-	draw_square(triangle_x-(trianglesize)/2, triangle_y-trianglesize, color_box[3]);
-	draw_square(triangle_x-trianglesize+1, triangle_y-1, color_box[3]);
-	draw_line(triangle_x-(trianglesize)/2, triangle_y-trianglesize, triangle_x-1,  triangle_y-1, color_box[3]);
-	draw_line(triangle_x-trianglesize+1, triangle_y-1, triangle_x-1, triangle_y-1, color_box[3]);
-	draw_line(triangle_x-trianglesize+1, triangle_y-1, triangle_x-(trianglesize)/2, triangle_y-trianglesize, color_box[3]);
+void draw_triangle_barrier(int triangle_x, int triangle_y, int trianglesize, int color) {
+	draw_square(triangle_x-1, triangle_y-1, color);
+	draw_square(triangle_x-(trianglesize)/2, triangle_y-trianglesize, color);
+	draw_square(triangle_x-trianglesize+1, triangle_y-1, color);
+	draw_line(triangle_x-(trianglesize)/2, triangle_y-trianglesize, triangle_x-1,  triangle_y-1,color);
+	draw_line(triangle_x-trianglesize+1, triangle_y-1, triangle_x-1, triangle_y-1,color);
+	draw_line(triangle_x-trianglesize+1, triangle_y-1, triangle_x-(trianglesize)/2, triangle_y-trianglesize, color);
 }
 
 //Updating position for triangle as the obstacles move
@@ -1119,7 +1148,7 @@ void clear_screen_for_triangle(int triangle_x, int triangle_y, int trianglesize,
 	draw_line(triangle_x-trianglesize+1, triangle_y-1, triangle_x-(trianglesize)/2, triangle_y-trianglesize, erase_colour);
 }
 
-//Draw line using Bresenham’s algorithm
+//Draw line using Bresenhamâ€™s algorithm
 void draw_line(int x0, int y0, int x1, int y1, short int line_colour) {
 	bool is_steep;
 	int x;
@@ -1174,6 +1203,7 @@ void plot_pixel(int x, int y, short int line_color)
     *(short int *)(pixel_buffer_start + (y << 10) + (x << 1)) = line_color;
 }
 
+//Wait for vync to change buffers
 void wait_for_vsync() {
 	volatile int * pixel_ctrl_ptr = 0xFF203020; //pixel controller
 	register int status;
@@ -1183,3 +1213,5 @@ void wait_for_vsync() {
 		status = *(pixel_ctrl_ptr +3 );
 	}
 }
+	
+	
