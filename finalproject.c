@@ -1,4 +1,11 @@
 /*----------------------------------------------------------------------------------------------------------*/
+//ECE243 Project: Geometry Dash
+//TA: Mathew Hildebrand
+//Station Number: 77
+//Names: Leitan Zhang (1004722153), Ellen Chen (1005221831)
+/*----------------------------------------------------------------------------------------------------------*/
+
+/*----------------------------------------------------------------------------------------------------------*/
 //address_map_arm.h
 /*----------------------------------------------------------------------------------------------------------*/
 
@@ -1203,7 +1210,6 @@ void plot_pixel(int x, int y, short int line_color)
     *(short int *)(pixel_buffer_start + (y << 10) + (x << 1)) = line_color;
 }
 
-//Wait for vync to change buffers
 void wait_for_vsync() {
 	volatile int * pixel_ctrl_ptr = 0xFF203020; //pixel controller
 	register int status;
